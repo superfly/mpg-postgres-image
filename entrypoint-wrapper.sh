@@ -22,6 +22,14 @@ echo "Started postmaster OOM adjuster in background"
 export PG_OOM_ADJUST_FILE=/proc/self/oom_score_adj
 export PG_OOM_ADJUST_VALUE=0
 
-# Verify the original entrypoint exists
+# Switching to the original user and executing original entrypoint
 echo "Switching to user $ORIGINAL_USER and executing original entrypoint: $ORIGINAL_ENTRYPOINT $@"
-exec gosu $ORIGINAL_USER "$ORIGINAL_ENTRYPOINT" "$@"
+
+# Check which user-switching command is available
+if command -v runuser >/dev/null 2>&1; then
+    # Use runuser (available on RHEL/CentOS/Fedora)
+    exec runuser -u "#$ORIGINAL_USER" -- "$ORIGINAL_ENTRYPOINT" "$@"
+else
+    # Fall back to su
+    exec su -s /bin/bash $ORIGINAL_USER -c "$ORIGINAL_ENTRYPOINT $*"
+fi
