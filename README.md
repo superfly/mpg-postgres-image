@@ -8,6 +8,7 @@ This Docker image extends `percona/percona-postgresql-operator:2.6.0-ppg16.8-pos
 - Uses a root-to-user approach to ensure proper privileges for OOM adjustment
 - Intelligently identifies and protects the PostgreSQL postmaster process
 - Preserves the original container entrypoint and behavior
+- Multi-architecture support (amd64/x86_64 and arm64/aarch64)
 
 ## How It Works
 
@@ -44,16 +45,19 @@ docker run -d --name postgres oom-protected-postgres
 
 This repository includes a GitHub Action that automatically builds and pushes the Docker image to GitHub Container Registry (ghcr.io) whenever changes are pushed to the main branch.
 
-### Automated Builds
+### Automated Multi-Architecture Builds
 
 The workflow:
-1. Builds the Docker image
-2. Tags it with both `latest` and the short commit SHA
-3. Pushes it to GitHub Container Registry
+1. Builds the Docker image for multiple architectures (amd64 and arm64)
+2. Tags it with:
+   - `latest` tag
+   - Short SHA of the commit (e.g., `sha-a1b2c3d`)
+   - Date in YYYYMMDD format
+3. Pushes it to GitHub Container Registry as a multi-architecture manifest
 
 ### Using the Pre-built Image
 
-Once built, you can pull the image directly:
+Once built, you can pull the image directly, and Docker will automatically select the right architecture for your system:
 
 ```bash
 docker pull ghcr.io/[your-username]/mpg-postgres-image/oom-protected-postgres:latest
