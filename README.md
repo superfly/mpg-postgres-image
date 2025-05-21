@@ -4,20 +4,36 @@ This Docker image extends `percona/percona-postgresql-operator:2.6.0-ppg16.8-pos
 
 ## Features
 
-- Sets OOM score adjustment to `-900` for the Patroni process (which manages PostgreSQL)
+- Sets OOM score adjustment to `-900` for the PostgreSQL postmaster process
+- Uses a root-to-user approach to ensure proper privileges for OOM adjustment
+- Intelligently identifies and protects the PostgreSQL postmaster process
+- Preserves the original container entrypoint and behavior
 
 ## How It Works
 
-This image works with the Percona PostgreSQL Operator architecture:
+This image uses a focused approach to OOM protection specifically targeting the PostgreSQL postmaster process:
 
-1. Patroni is the process manager that starts and manages PostgreSQL
-2. Our wrapper script sets the OOM score adjustment to -1000 for the Patroni process
-3. This adjustment is inherited by PostgreSQL processes, protecting them from OOM killer
-4. The wrapper script preserves the original entrypoint behavior of the parent image
+1. The container temporarily runs as root to gain necessary privileges
+2. Our wrapper script sets the initial OOM score adjustment to -900
+3. A background monitor continuously identifies and adjusts the PostgreSQL postmaster process
+4. The script exports PG_OOM environment variables for child process handling
+5. The wrapper script executes the original entrypoint with the original user (UID 26)
+
+This approach ensures that the PostgreSQL postmaster process (the main database process) is the last process to be killed by the Linux OOM killer if memory becomes scarce.
+
+## Technical Details
+
+The wrapper script uses multiple methods to identify the PostgreSQL postmaster process:
+
+1. Pattern matching for `postgres -D /pgdata/pg`
+2. Parent-child relationship detection for postgres processes
+3. Fallback to single postgres process detection
+
+All actions are logged to `/tmp/postgres-oom-adjuster.log` for transparency and debugging.
 
 ## Usage
 
-### Basic Usage
+### Basic Docker Usage
 
 ```bash
 docker build -t oom-protected-postgres .
@@ -43,13 +59,10 @@ Once built, you can pull the image directly:
 docker pull ghcr.io/[your-username]/mpg-postgres-image/oom-protected-postgres:latest
 ```
 
-### GitHub Action Configuration
-
-The GitHub Action configuration is defined in `.github/workflows/build-and-push.yml`. If you fork this repository, you'll need to ensure your repository has permission to push packages. You can configure this in your repository settings under "Actions" > "General" > "Workflow permissions".
-
 ## References
 
 - [PostgreSQL documentation on kernel resources](https://www.postgresql.org/docs/current/kernel-resources.html)
 - [Percona blog on Out-of-Memory killer](https://www.percona.com/blog/out-of-memory-killer-or-savior/)
 - [Docker Hub: percona/percona-postgresql-operator](https://hub.docker.com/r/percona/percona-postgresql-operator)
 - [Patroni documentation](https://patroni.readthedocs.io/)
+- [Percona Operator for PostgreSQL - Custom Resource options](https://docs.percona.com/percona-operator-for-postgresql/2.0/operator.html?h=custom+resource#patronidynamicconfiguration)
