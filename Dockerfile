@@ -1,4 +1,5 @@
-FROM percona/percona-postgresql-operator:2.6.0-ppg16.8-postgres
+ARG BASE_IMAGE_TAG=2.6.0-ppg16.8-postgres
+FROM percona/percona-postgresql-operator:${BASE_IMAGE_TAG}
 
 # Switch to root user temporarily to gain necessary privileges for setup
 USER 0
