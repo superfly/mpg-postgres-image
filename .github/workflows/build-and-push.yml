@@ -46,13 +46,38 @@ jobs:
             type=sha,format=short
             type=raw,value={{date 'YYYYMMDD'}}
 
-      - name: Build and push Docker image
+      - name: Extract metadata for Docker - PostGIS
+        id: meta-postgis
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=raw,value=latest,suffix=-postgis
+            type=sha,format=short,suffix=-postgis
+            type=raw,value={{date 'YYYYMMDD'}},suffix=-postgis
+
+      - name: Build and push Docker image - Standard
         uses: docker/build-push-action@v5
         with:
           context: .
+          build-args: |
+            BASE_IMAGE_TAG=2.6.0-ppg16.8-postgres
           platforms: linux/amd64,linux/arm64
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build and push Docker image - PostGIS
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          build-args: |
+            BASE_IMAGE_TAG=2.6.0-ppg16.8-postgres-gis3.3.8
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta-postgis.outputs.tags }}
+          labels: ${{ steps.meta-postgis.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
