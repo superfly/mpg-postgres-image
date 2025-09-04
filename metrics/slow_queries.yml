@@ -1,0 +1,63 @@
+#==============================================================#
+# Slow Query Monitoring using pg_stat_monitor
+#==============================================================#
+# Tracks queries that exceed performance thresholds
+# Requires pg_stat_monitor extension
+
+slow_queries:
+  name: slow_queries
+  desc: Queries exceeding execution time thresholds from pg_stat_monitor
+  query: |
+    SELECT
+      COALESCE(userid::regrole::text, 'unknown') as user,
+      COALESCE(datname, current_database()) as datname,
+      queryid::text as queryid,
+      left(regexp_replace(query, '\s+', ' ', 'g'), 100) as query_text,
+      calls::float8 as calls,
+      mean_exec_time::float8 as mean_exec_time,
+      max_exec_time::float8 as max_exec_time,
+      total_exec_time::float8 as total_exec_time,
+      rows::float8 as rows_retrieved,
+      (COALESCE(shared_blks_hit, 0) + COALESCE(shared_blks_read, 0))::float8 as total_blocks,
+      (COALESCE(cpu_user_time, 0) + COALESCE(cpu_sys_time, 0))::float8 as total_cpu_time
+    FROM pg_stat_monitor
+    WHERE mean_exec_time > 1000  -- Queries averaging over 1 second
+    ORDER BY mean_exec_time DESC
+    LIMIT 20;
+  ttl: 60
+  timeout: 5
+  tags: [ extension:pg_stat_monitor ]
+  metrics:
+    - user:
+        usage: LABEL
+        description: Database user executing the query
+    - datname:
+        usage: LABEL
+        description: Database name
+    - queryid:
+        usage: LABEL
+        description: Query identifier
+    - query_text:
+        usage: LABEL
+        description: Normalized query text (first 100 chars)
+    - calls:
+        usage: GAUGE
+        description: Number of times this query was executed
+    - mean_exec_time:
+        usage: GAUGE
+        description: Average execution time in milliseconds
+    - max_exec_time:
+        usage: GAUGE
+        description: Maximum execution time in milliseconds
+    - total_exec_time:
+        usage: GAUGE
+        description: Total time spent on this query in milliseconds
+    - rows_retrieved:
+        usage: GAUGE
+        description: Total rows retrieved by all executions
+    - total_blocks:
+        usage: GAUGE
+        description: Total blocks accessed (hit + read)
+    - total_cpu_time:
+        usage: GAUGE
+        description: Total CPU time consumed in milliseconds

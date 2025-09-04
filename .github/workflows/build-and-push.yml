@@ -8,6 +8,7 @@ on:
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}/mpg-operator-postgres
+  EXPORTER_IMAGE_NAME: ${{ github.repository }}/pg-exporter
 
 jobs:
   build-and-push:
@@ -125,5 +126,26 @@ jobs:
           push: true
           tags: ${{ steps.meta-pg17-postgis.outputs.tags }}
           labels: ${{ steps.meta-pg17-postgis.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Extract metadata for Docker - PG Exporter
+        id: meta-exporter
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.EXPORTER_IMAGE_NAME }}
+          tags: |
+            type=raw,value=latest
+            type=sha,format=short
+            type=raw,value={{date 'YYYYMMDD'}}
+
+      - name: Build and push Docker image - PG Exporter
+        uses: docker/build-push-action@v5
+        with:
+          context: ./metrics
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta-exporter.outputs.tags }}
+          labels: ${{ steps.meta-exporter.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
