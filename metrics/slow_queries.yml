@@ -1,27 +1,90 @@
-#==============================================================#
-# Slow Query Monitoring using pg_stat_monitor
-#==============================================================#
+#==============================================================================#
+# Slow Query Monitoring with Unlimited Sequential Parameter Numbering (Pure SQL)
+#==============================================================================#
 # Tracks queries that exceed performance thresholds
 # Requires pg_stat_monitor extension
 
-slow_queries:
-  name: slow_queries
-  desc: Queries exceeding execution time thresholds from pg_stat_monitor
+pg_slow_queries:
+  name: pg_slow_queries
+  desc: Queries exceeding execution time thresholds with normalized text (no PII) and unlimited sequential parameters
   query: |
-    SELECT
-      COALESCE(userid::regrole::text, 'unknown') as user,
-      COALESCE(datname, current_database()) as datname,
-      queryid::text as queryid,
-      left(regexp_replace(query, '\s+', ' ', 'g'), 100) as query_text,
-      calls::float8 as calls,
-      mean_exec_time::float8 as mean_exec_time,
-      max_exec_time::float8 as max_exec_time,
-      total_exec_time::float8 as total_exec_time,
-      rows::float8 as rows_retrieved,
-      (COALESCE(shared_blks_hit, 0) + COALESCE(shared_blks_read, 0))::float8 as total_blocks,
-      (COALESCE(cpu_user_time, 0) + COALESCE(cpu_sys_time, 0))::float8 as total_cpu_time
-    FROM pg_stat_monitor
-    WHERE mean_exec_time > 1000  -- Queries averaging over 1 second
+    WITH RECURSIVE 
+    base_queries AS (
+      SELECT
+        COALESCE(userid::regrole::text, 'unknown') as user,
+        COALESCE(datname, current_database()) as datname,
+        queryid::text as queryid,
+        calls::float8 as calls,
+        mean_exec_time::float8 as mean_exec_time,
+        max_exec_time::float8 as max_exec_time,
+        total_exec_time::float8 as total_exec_time,
+        rows::float8 as rows_retrieved,
+        (COALESCE(shared_blks_hit, 0) + COALESCE(shared_blks_read, 0))::float8 as total_blocks,
+        (COALESCE(cpu_user_time, 0) + COALESCE(cpu_sys_time, 0))::float8 as total_cpu_time,
+        -- Mark all parameters with ¤P¤
+        regexp_replace(
+          regexp_replace(
+            regexp_replace(
+              regexp_replace(
+                regexp_replace(
+                  regexp_replace(query, '\s+', ' ', 'g'),
+                  '''[^'']*''', '¤P¤', 'g'
+                ),
+                '\m\d+\.?\d*\M', '¤P¤', 'g'
+              ),
+              '0x[0-9a-fA-F]+', '¤P¤', 'g'
+            ),
+            '[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}', '¤P¤', 'g'
+          ),
+          '[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}', '¤P¤', 'g'
+        ) as query_text,
+        1 as param_num
+      FROM pg_stat_monitor
+      WHERE mean_exec_time > 1000
+    ),
+    -- Recursive CTE to number parameters sequentially
+    numbered_queries AS (
+      -- Base case: queries to process
+      SELECT 
+        user, datname, queryid, calls, mean_exec_time, max_exec_time,
+        total_exec_time, rows_retrieved, total_blocks, total_cpu_time,
+        query_text, param_num
+      FROM base_queries
+      
+      UNION ALL
+      
+      -- Recursive case: replace one ¤P¤ at a time with incrementing numbers
+      SELECT 
+        user, datname, queryid, calls, mean_exec_time, max_exec_time,
+        total_exec_time, rows_retrieved, total_blocks, total_cpu_time,
+        regexp_replace(query_text, '¤P¤', '$' || param_num::text, 1) as query_text,
+        param_num + 1 as param_num
+      FROM numbered_queries
+      WHERE position('¤P¤' in query_text) > 0
+        AND param_num <= 50  -- Safety limit to prevent infinite recursion
+    ),
+    -- Get the final result (highest param_num for each query)
+    final_queries AS (
+      SELECT DISTINCT ON (queryid)
+        user, datname, queryid, calls, mean_exec_time, max_exec_time,
+        total_exec_time, rows_retrieved, total_blocks, total_cpu_time,
+        query_text as query_pattern
+      FROM numbered_queries
+      ORDER BY queryid, param_num DESC
+    )
+    SELECT 
+      user,
+      datname,
+      queryid,
+      left(query_pattern, 100) as query_pattern,
+      calls,
+      mean_exec_time,
+      max_exec_time,
+      total_exec_time,
+      rows_retrieved,
+      total_blocks,
+      total_cpu_time
+    FROM final_queries
     ORDER BY mean_exec_time DESC
     LIMIT 20;
   ttl: 60
@@ -37,9 +100,9 @@ slow_queries:
     - queryid:
         usage: LABEL
         description: Query identifier
-    - query_text:
+    - query_pattern:
         usage: LABEL
-        description: Normalized query text (first 100 chars)
+        description: Normalized query pattern
     - calls:
         usage: GAUGE
         description: Number of times this query was executed
