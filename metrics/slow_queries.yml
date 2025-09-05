@@ -76,7 +76,7 @@ pg_slow_queries:
       user,
       datname,
       queryid,
-      left(query_pattern, 100) as query_pattern,
+      left(query_pattern, 500) as query_pattern,
       calls,
       mean_exec_time,
       max_exec_time,
