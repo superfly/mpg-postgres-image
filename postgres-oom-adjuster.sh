@@ -43,11 +43,32 @@ while true; do
         if [ "$CURRENT_SCORE" != "-900" ]; then
             echo -900 > /proc/$POSTMASTER_PID/oom_score_adj
             echo "$(date): Adjusted OOM score for postmaster PID $POSTMASTER_PID from $CURRENT_SCORE to -900" >> $LOG_FILE
-        else
-            echo "$(date): Postmaster PID $POSTMASTER_PID already has OOM score -900" >> $LOG_FILE
         fi
     else
-        echo "$(date): Postmaster not found yet or OOM score file not accessible" >> $LOG_FILE
+        # Band-aid for the Postmaster PID problem. Actual fix is in Patroni >= 4.0.6.
+        # Ref.: https://github.com/patroni/patroni/pull/3372
+        echo "$(date): Postmaster not found, checking for orphaned shared memory" >> $LOG_FILE
+
+        # Clean up orphaned POSIX shared memory segments
+        # These block PostgreSQL startup if left behind after a crash
+        if [ -d "/dev/shm" ]; then
+            for shm_file in /dev/shm/PostgreSQL.*; do
+                if [ -f "$shm_file" ]; then
+                    echo "$(date): Removing orphaned POSIX shared memory: $shm_file" >> $LOG_FILE
+                    rm -f "$shm_file" 2>/dev/null
+                fi
+            done
+        fi
+
+        # Clean up orphaned System V shared memory segments (nattch=0 means no attached processes)
+        if command -v ipcs >/dev/null 2>&1 && command -v ipcrm >/dev/null 2>&1; then
+            for shmid in $(ipcs -m 2>/dev/null | awk 'NR>3 && $6==0 {print $2}'); do
+                if [ -n "$shmid" ]; then
+                    echo "$(date): Removing orphaned SysV shared memory segment: $shmid" >> $LOG_FILE
+                    ipcrm -m "$shmid" 2>/dev/null
+                fi
+            done
+        fi
     fi
 
     # Sleep for a while before checking again
