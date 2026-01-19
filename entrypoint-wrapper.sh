@@ -32,8 +32,13 @@ echo "Started postmaster OOM adjuster in background"
 export PG_OOM_ADJUST_FILE=/proc/self/oom_score_adj
 export PG_OOM_ADJUST_VALUE=0
 
-# Switching to the original user and executing command
-echo "Switching to user $ORIGINAL_USER and executing: $@"
+CURRENT_UID=$(id -u)
+if [ "$CURRENT_UID" = "$ORIGINAL_USER" ]; then
+    echo "Already running as user $ORIGINAL_USER (uid=$CURRENT_UID), executing: $@"
+    exec "$@"
+fi
+
+echo "Running as uid=$CURRENT_UID, switching to user $ORIGINAL_USER and executing: $@"
 
 # Check which user-switching command is available
 if command -v runuser >/dev/null 2>&1; then
