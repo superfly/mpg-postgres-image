@@ -45,6 +45,12 @@ RUN set -ex; \
 
 ENV NSS_WRAPPER_SUBDIR=postgres
 
+# ── Remove RPM default config ─────────────────────────────────────────────────
+# percona-pgbackrest ships /etc/pgbackrest.conf with repo-path (1.x alias).
+# pgbackrest 2.36+ errors when both repo-path and repo1-path appear in [global].
+# All config comes from operator ConfigMaps mounted at /etc/pgbackrest/conf.d/.
+RUN rm -f /etc/pgbackrest.conf
+
 # ── Directory structure ───────────────────────────────────────────────────────
 RUN set -ex; \
     mkdir -p \

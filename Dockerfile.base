@@ -119,7 +119,11 @@ RUN set -ex; \
 RUN echo "huge_pages = off" >> /usr/pgsql-${PG_MAJOR}/share/postgresql.conf.sample
 
 # ── Cleanup ───────────────────────────────────────────────────────────────────
-RUN rm -rf /var/spool/pgbackrest
+# Remove RPM-installed default pgbackrest.conf (/etc/pgbackrest.conf ships with
+# repo-path=/var/lib/pgbackrest — the old 1.x alias for repo1-path). pgbackrest
+# 2.36+ treats both names in the same section as a duplicate error. The operator
+# manages all pgbackrest config exclusively via ConfigMaps in /etc/pgbackrest/conf.d/.
+RUN rm -f /etc/pgbackrest.conf && rm -rf /var/spool/pgbackrest
 
 EXPOSE 5432
 VOLUME ["/sshd", "/pgconf", "/pgdata", "/pgwal", "/backrestrepo"]
