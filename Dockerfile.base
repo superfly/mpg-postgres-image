@@ -1,6 +1,6 @@
 ARG PG_MAJOR=17
 
-FROM registry.access.redhat.com/ubi9/ubi-minimal:latest
+FROM oraclelinux:9-slim
 
 ARG PG_MAJOR
 
@@ -17,15 +17,13 @@ RUN microdnf -y update && \
     microdnf clean all && \
     rm -rf /var/cache/dnf /var/cache/yum
 
-# ── Repo setup: Percona + Fedora EPEL ────────────────────────────────────────
-# Both are noarch packages — no arch-specific URLs needed.
+# ── Repo setup: Percona + Oracle EPEL ───────────────────────────────────────
+# oracle-epel-release-el9 is in Oracle Linux repos — no external download needed.
 RUN set -ex; \
-    microdnf -y install findutils; \
+    microdnf -y install findutils oracle-epel-release-el9; \
     curl -Lfs -o /tmp/percona-release.rpm \
       "https://repo.percona.com/yum/percona-release-latest.noarch.rpm"; \
-    curl -Lfs -o /tmp/epel-release.rpm \
-      "https://dl.fedoraproject.org/pub/epel/epel-release-latest-9.noarch.rpm"; \
-    rpm -i /tmp/percona-release.rpm /tmp/epel-release.rpm; \
+    rpm -i /tmp/percona-release.rpm; \
     percona-release enable ppg-${PG_MAJOR} release; \
     rm -f /tmp/*.rpm; \
     microdnf clean all
