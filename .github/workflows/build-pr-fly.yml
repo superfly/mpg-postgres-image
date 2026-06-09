@@ -14,6 +14,9 @@ on:
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}/mpg-operator-postgres
+  PG16_VERSION: "16.14"
+  PG17_VERSION: "17.10"
+  PATRONI_VERSION: "4.1.3"
 
 jobs:
 
@@ -26,13 +29,10 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
         with:
-          platforms: linux/amd64,linux/arm64
+          platforms: linux/amd64
 
       - name: Log in to the Container registry
         uses: docker/login-action@v3
@@ -48,7 +48,9 @@ jobs:
           file: Dockerfile.base
           build-args: |
             PG_MAJOR=16
-          platforms: linux/amd64,linux/arm64
+            PG_FULL_VERSION=${{ env.PG16_VERSION }}
+            PATRONI_VERSION=${{ env.PATRONI_VERSION }}
+          platforms: linux/amd64
           push: true
           tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:pr-${{ github.event.pull_request.number }}-fly-pg16
           cache-from: type=gha
@@ -61,7 +63,9 @@ jobs:
           file: Dockerfile.base
           build-args: |
             PG_MAJOR=17
-          platforms: linux/amd64,linux/arm64
+            PG_FULL_VERSION=${{ env.PG17_VERSION }}
+            PATRONI_VERSION=${{ env.PATRONI_VERSION }}
+          platforms: linux/amd64
           push: true
           tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:pr-${{ github.event.pull_request.number }}-fly-pg17
           cache-from: type=gha
@@ -77,13 +81,10 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
         with:
-          platforms: linux/amd64,linux/arm64
+          platforms: linux/amd64
 
       - name: Log in to the Container registry
         uses: docker/login-action@v3
@@ -101,7 +102,7 @@ jobs:
             PG_MAJOR=16
             REGISTRY=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
             BASE_TAG=pr-${{ github.event.pull_request.number }}-fly-pg16
-          platforms: linux/amd64,linux/arm64
+          platforms: linux/amd64
           push: true
           tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:pr-${{ github.event.pull_request.number }}-fly-pg16-postgis
           cache-from: type=gha
@@ -116,7 +117,7 @@ jobs:
             PG_MAJOR=17
             REGISTRY=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
             BASE_TAG=pr-${{ github.event.pull_request.number }}-fly-pg17
-          platforms: linux/amd64,linux/arm64
+          platforms: linux/amd64
           push: true
           tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:pr-${{ github.event.pull_request.number }}-fly-pg17-postgis
           cache-from: type=gha

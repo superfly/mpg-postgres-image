@@ -3,6 +3,8 @@ ARG PG_MAJOR=17
 FROM oraclelinux:9-slim
 
 ARG PG_MAJOR
+ARG PG_FULL_VERSION=17.10
+ARG PATRONI_VERSION=4.1.3
 
 LABEL maintainer="Fly.io" \
       description="PostgreSQL with Patroni for the Percona Operator 2.6, built from scratch"
@@ -39,7 +41,7 @@ RUN set -ex; \
       bind-utils gettext hostname python3-pyparsing perl libedit \
       openssh openssh-server openssh-clients procps-ng \
       libpq glibc-all-langpacks \
-      percona-postgresql${PG_MAJOR}; \
+      percona-postgresql${PG_MAJOR}-${PG_FULL_VERSION}; \
     microdnf -y reinstall tzdata; \
     microdnf clean all
 
@@ -49,15 +51,15 @@ RUN set -ex; \
       percona-pgaudit${PG_MAJOR} \
       percona-pgaudit${PG_MAJOR}_set_user \
       percona-pgbackrest \
-      percona-postgresql${PG_MAJOR}-contrib \
-      percona-postgresql${PG_MAJOR}-server \
-      percona-postgresql${PG_MAJOR}-libs \
+      percona-postgresql${PG_MAJOR}-contrib-${PG_FULL_VERSION} \
+      percona-postgresql${PG_MAJOR}-server-${PG_FULL_VERSION} \
+      percona-postgresql${PG_MAJOR}-libs-${PG_FULL_VERSION} \
       percona-pg_stat_monitor${PG_MAJOR} \
       percona-wal2json${PG_MAJOR} \
       percona-pg_repack${PG_MAJOR} \
       psmisc rsync perl nss_wrapper tar bzip2 lz4 file tzdata unzip \
       python3-psycopg2 python3-ydiff python3-dateutil python3-urllib3 \
-      python3-pyyaml python3-click ydiff percona-patroni; \
+      python3-pyyaml python3-click ydiff percona-patroni-${PATRONI_VERSION}; \
     microdnf clean all; \
     rm -rf /var/cache/dnf /var/cache/yum
 
