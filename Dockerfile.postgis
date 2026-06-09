@@ -1,0 +1,35 @@
+ARG REGISTRY=ghcr.io/superfly/mpg-postgres-image/mpg-operator-postgres
+ARG BASE_TAG
+ARG PG_MAJOR=16
+
+FROM ${REGISTRY}:${BASE_TAG}
+
+ARG PG_MAJOR
+ARG TARGETARCH
+
+LABEL maintainer="Fly.io" \
+      description="PostgreSQL with PostGIS and Patroni for the Percona Operator 2.6"
+
+USER 0
+
+# ── PostGIS via PGDG ──────────────────────────────────────────────────────────
+# Percona's repos don't include PostGIS; PGDG is the canonical source.
+# PGDG postgres packages (postgresql${PG_MAJOR}-*) have different names than
+# Percona's (percona-postgresql${PG_MAJOR}-*), so there are no conflicts.
+RUN set -ex; \
+    case "${TARGETARCH}" in \
+      amd64) PGDG_ARCH="x86_64" ;; \
+      arm64) PGDG_ARCH="aarch64" ;; \
+      *)     PGDG_ARCH=$(uname -m) ;; \
+    esac; \
+    curl -Lfs -o /tmp/pgdg-release.rpm \
+        "https://download.postgresql.org/pub/repos/yum/reporpms/EL-9-${PGDG_ARCH}/pgdg-redhat-repo-latest.noarch.rpm"; \
+    rpm -i /tmp/pgdg-release.rpm; \
+    rm -f /tmp/pgdg-release.rpm; \
+    microdnf -y install \
+        postgis34_${PG_MAJOR} \
+        postgis34_${PG_MAJOR}-client; \
+    microdnf clean all; \
+    rm -rf /var/cache/dnf /var/cache/yum
+
+USER 26

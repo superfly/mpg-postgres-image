@@ -1,0 +1,123 @@
+name: Build PR Fly Images
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - Dockerfile.base
+      - Dockerfile.postgis
+      - scripts/**
+      - postgres-oom-adjuster.sh
+      - .github/workflows/build-pr-fly.yml
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}/mpg-operator-postgres
+
+jobs:
+
+  build-base-pr:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        with:
+          platforms: linux/amd64,linux/arm64
+
+      - name: Log in to the Container registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push - pr-${{ github.event.pull_request.number }}-fly-pg16
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: Dockerfile.base
+          build-args: |
+            PG_MAJOR=16
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:pr-${{ github.event.pull_request.number }}-fly-pg16
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build and push - pr-${{ github.event.pull_request.number }}-fly-pg17
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: Dockerfile.base
+          build-args: |
+            PG_MAJOR=17
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:pr-${{ github.event.pull_request.number }}-fly-pg17
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  build-postgis-pr:
+    needs: build-base-pr
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        with:
+          platforms: linux/amd64,linux/arm64
+
+      - name: Log in to the Container registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push - pr-${{ github.event.pull_request.number }}-fly-pg16-postgis
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: Dockerfile.postgis
+          build-args: |
+            PG_MAJOR=16
+            REGISTRY=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+            BASE_TAG=pr-${{ github.event.pull_request.number }}-fly-pg16
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:pr-${{ github.event.pull_request.number }}-fly-pg16-postgis
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build and push - pr-${{ github.event.pull_request.number }}-fly-pg17-postgis
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: Dockerfile.postgis
+          build-args: |
+            PG_MAJOR=17
+            REGISTRY=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+            BASE_TAG=pr-${{ github.event.pull_request.number }}-fly-pg17
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:pr-${{ github.event.pull_request.number }}-fly-pg17-postgis
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
