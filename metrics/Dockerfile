@@ -1,6 +1,6 @@
-FROM pgsty/pg_exporter:1.0.2 as base
+FROM pgsty/pg_exporter:1.2.2 as base
 
-FROM pgsty/pg_exporter:1.0.2
+FROM pgsty/pg_exporter:1.2.2
 
 COPY --from=base /etc/pg_exporter.yml /etc/pg_exporter/pg_exporter.yml
 

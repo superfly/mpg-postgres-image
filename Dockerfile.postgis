@@ -1,0 +1,24 @@
+ARG REGISTRY=ghcr.io/superfly/mpg-postgres-image/mpg-operator-postgres
+ARG BASE_TAG
+ARG PG_MAJOR=16
+
+FROM ${REGISTRY}:${BASE_TAG}
+
+ARG PG_MAJOR
+
+LABEL maintainer="Fly.io" \
+      description="PostgreSQL with PostGIS and Patroni for the Percona Operator 2.6"
+
+USER 0
+
+# ── PostGIS via Percona repo ──────────────────────────────────────────────────
+# percona-postgis33 pulls in gdal311-libs, which requires libqhull_r.
+# libqhull_r lives in Oracle Linux CRB — enable it just for this install.
+RUN set -ex; \
+    microdnf --enablerepo=ol9_codeready_builder -y install \
+        percona-postgis33_${PG_MAJOR} \
+        percona-postgis33_${PG_MAJOR}-client; \
+    microdnf clean all; \
+    rm -rf /var/cache/dnf /var/cache/yum
+
+USER 26

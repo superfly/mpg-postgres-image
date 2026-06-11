@@ -1,0 +1,71 @@
+ARG PGBACKREST_VERSION=2.54.2
+
+FROM oraclelinux:9-slim
+
+ARG PGBACKREST_VERSION
+
+LABEL maintainer="Fly.io" \
+      description="pgBackRest repo-host for the Percona Operator 2.6"
+
+ENV LC_ALL=en_US.utf-8 \
+    LANG=en_US.utf-8 \
+    container=oci
+
+# ── Base OS ──────────────────────────────────────────────────────────────────
+RUN microdnf -y update && \
+    microdnf -y install glibc-langpack-en && \
+    microdnf clean all && \
+    rm -rf /var/cache/dnf /var/cache/yum
+
+# ── Repo setup: Percona + Oracle EPEL ───────────────────────────────────────
+RUN set -ex; \
+    microdnf -y install findutils oracle-epel-release-el9; \
+    curl -Lfs -o /tmp/percona-release.rpm \
+      "https://repo.percona.com/yum/percona-release-latest.noarch.rpm"; \
+    rpm -i /tmp/percona-release.rpm; \
+    percona-release enable ppg-16 release; \
+    rm -f /tmp/*.rpm; \
+    microdnf clean all
+
+# ── pgBackRest + runtime deps ─────────────────────────────────────────────────
+# bash: required by the operator's config-reloader and nss-wrapper-init containers
+# nss_wrapper: operator injects LD_PRELOAD=/usr/lib64/libnss_wrapper.so
+# openssh-clients: needed for SFTP repo type
+# Compression libs (lz4, bzip2, zstd) pulled in as RPM deps of percona-pgbackrest
+RUN set -ex; \
+    microdnf -y install \
+      percona-pgbackrest-${PGBACKREST_VERSION} \
+      nss_wrapper \
+      bash \
+      tar \
+      openssh-clients \
+      gettext \
+      procps-ng; \
+    microdnf clean all; \
+    rm -rf /var/cache/dnf /var/cache/yum
+
+ENV NSS_WRAPPER_SUBDIR=postgres
+
+# ── Remove RPM default config ─────────────────────────────────────────────────
+# percona-pgbackrest ships /etc/pgbackrest.conf with repo-path (1.x alias).
+# pgbackrest 2.36+ errors when both repo-path and repo1-path appear in [global].
+# All config comes from operator ConfigMaps mounted at /etc/pgbackrest/conf.d/.
+RUN rm -f /etc/pgbackrest.conf
+
+# ── Directory structure ───────────────────────────────────────────────────────
+RUN set -ex; \
+    mkdir -p \
+      /etc/pgbackrest/conf.d \
+      /var/log/pgbackrest \
+      /backrestrepo; \
+    chown -R 26:0 \
+      /etc/pgbackrest \
+      /var/log/pgbackrest \
+      /backrestrepo; \
+    chmod -R g=u \
+      /etc/pgbackrest \
+      /var/log/pgbackrest \
+      /backrestrepo
+
+USER 26
+CMD ["pgbackrest", "server"]
