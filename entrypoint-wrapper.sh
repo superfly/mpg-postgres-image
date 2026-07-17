@@ -22,6 +22,13 @@ echo "Started postmaster OOM adjuster in background"
 export PG_OOM_ADJUST_FILE=/proc/self/oom_score_adj
 export PG_OOM_ADJUST_VALUE=0
 
+if [ "$MPG_PATRONI_SELF_NAME" = "1" ]; then
+    echo "MPG_PATRONI_SELF_NAME=1: deriving Patroni identity from FLY_MACHINE_ID/FLY_PRIVATE_IP"
+    export PATRONI_NAME="$FLY_MACHINE_ID"
+    export PATRONI_POSTGRESQL_CONNECT_ADDRESS="[$FLY_PRIVATE_IP]:${MPG_POSTGRES_PORT:-5432}"
+    export PATRONI_RESTAPI_CONNECT_ADDRESS="[$FLY_PRIVATE_IP]:${MPG_PATRONI_PORT:-8008}"
+fi
+
 # Switching to the original user and executing original entrypoint
 echo "Switching to user $ORIGINAL_USER and executing original entrypoint: $ORIGINAL_ENTRYPOINT $@"
 
